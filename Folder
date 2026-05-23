@@ -1,0 +1,196 @@
+{
+  "name": "mv-daily-shift-report",
+  "version": "1.0.0",
+  "description": "ALFANAR MV Daily Shift Report – Google Apps Script + GitHub CI",
+  "scripts": {
+    "push":  "cd apps-script && clasp push",
+    "pull":  "cd apps-script && clasp pull",
+    "open":  "cd apps-script && clasp open",
+    "logs":  "cd apps-script && clasp logs --watch"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}
+
+# MV Daily Shift Report – Automation
+
+> **ALFANAR PROJECTS | O&M – Medium Voltage Distribution Network**  
+> Automates daily shift report generation from a Google Sheet → Google Doc.
+
+---
+
+## Architecture
+
+```
+Google Sheet (ADF_New_Report)
+  ├── Shift_Reports       ← one row per report (Day/Night)
+  ├── Shift_Attendance    ← staff per shift
+  ├── Fault_Logs          ← faults during shift
+  ├── Major_Alarms        ← alarms during shift
+  ├── System_Readings     ← incomer & loop readings (every 2h)
+  └── Users_Directory     ← staff master list
+
+         ↓  Google Apps Script (Code.gs)
+
+Google Doc (generated copy of template)
+  └── Saved to your Drive Output Folder
+```
+
+**GitHub** hosts the script code. **GitHub Actions + clasp** pushes any commit on `main` directly to the Apps Script project.
+
+---
+
+## One-Time Setup (≈ 20 min)
+
+### Step 1 – Prepare Google Sheet
+
+1. Open your Google Sheet (`ADF_New_Report`).
+2. Note the **Sheet ID** from the URL:  
+   `https://docs.google.com/spreadsheets/d/`**`THIS_IS_YOUR_SHEET_ID`**`/edit`
+3. Confirm all tab names match exactly:
+   - `Shift_Reports`, `Shift_Attendance`, `Fault_Logs`, `Major_Alarms`, `System_Readings`, `Users_Directory`
+
+### Step 2 – Prepare the Google Doc Template
+
+1. Open your Google Doc template (`MV_Daily_Shift_Report_Template`).
+2. Note its **Doc ID** from the URL.
+3. Verify that the placeholder tags match the format `<<[FieldName]>>` and  
+   repeating blocks use `<<Start:[Related TableName]>>` … `<<End>>`.
+
+### Step 3 – Create an Output Folder in Drive
+
+1. Create a new folder in Google Drive (e.g. `MV Shift Reports – Generated`).
+2. Note the **Folder ID** from its URL.
+
+### Step 4 – Create the Apps Script Project
+
+1. Go to [script.google.com](https://script.google.com) → **New project**.
+2. Rename it to `MV_Daily_Report`.
+3. Copy the **Script ID** from: *Project Settings → IDs*.
+4. In `apps-script/.clasp.json`, replace `YOUR_APPS_SCRIPT_PROJECT_ID` with this value.
+5. In `apps-script/Code.gs`, fill in the three `CONFIG` values:
+
+```javascript
+const CONFIG = {
+  SHEET_ID:         "YOUR_GOOGLE_SHEET_ID_HERE",
+  TEMPLATE_DOC_ID:  "YOUR_GOOGLE_DOC_TEMPLATE_ID",
+  OUTPUT_FOLDER_ID: "YOUR_DRIVE_FOLDER_ID",
+  ...
+};
+```
+
+### Step 5 – Link GitHub to Apps Script via clasp
+
+Install clasp locally once:
+
+```bash
+npm install -g @google/clasp
+clasp login       # Opens browser → authorise with your Google account
+```
+
+This creates `~/.clasprc.json`. You'll need its contents for the GitHub Secret below.
+
+```bash
+# Clone this repo
+git clone https://github.com/YOUR_USERNAME/mv-daily-report.git
+cd mv-daily-report
+
+# First push
+cd apps-script
+clasp push
+```
+
+### Step 6 – Enable the Custom Menu
+
+1. Open your Google Sheet.
+2. You'll see a new **📋 MV Reports** menu (may require a page refresh).
+3. Use **MV Reports → Generate Pending Reports** whenever you are ready to generate.
+
+---
+
+## GitHub Actions (CI/CD)
+
+Every `git push` to `main` automatically deploys to Apps Script.
+
+### Add the GitHub Secret
+
+1. Go to your GitHub repo → **Settings → Secrets → Actions**.
+2. Add a new secret named **`CLASP_CREDENTIALS`**.
+3. Paste the entire contents of `~/.clasprc.json` as the value.
+
+```bash
+# Get the token content
+cat ~/.clasprc.json
+```
+
+4. Commit and push — the **Deploy Apps Script** workflow will run automatically.
+
+---
+
+## Usage
+
+### Manual Run (any time)
+
+1. Open the Google Sheet.
+2. Click **📋 MV Reports → Generate Pending Reports**.
+3. Any `Shift_Reports` row with an empty `Report_Status` will generate a Doc.
+4. The `Report_Status` column is updated with `Generated: <Doc URL>`.
+
+
+---
+
+## Data Entry Flow
+
+```
+Staff enter data into the Google Sheet tabs
+    ↓
+Run "Generate Pending Reports" (or wait for 18:30 trigger)
+    ↓
+Google Doc report created in Drive output folder
+    ↓
+Review Doc → add PM signature → share/print
+```
+
+---
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `Sheet "X" not found` | Check tab names in `CONFIG.SHEETS` match exactly (case-sensitive) |
+| Template placeholders not replaced | Ensure Doc tags use `<<[FieldName]>>` format with no extra spaces |
+| Trigger not firing | Re-run **Setup Daily Trigger** from the menu |
+| clasp push fails | Re-run `clasp login` and update `CLASP_CREDENTIALS` secret |
+| Doc created but blank | Check `Report_ID` column – must match exactly across all sheets |
+
+---
+
+## File Structure
+
+```
+mv-daily-report/
+├── apps-script/
+│   ├── Code.gs            ← Main automation script
+│   ├── appsscript.json    ← Apps Script manifest (scopes, timezone)
+│   └── .clasp.json        ← Links folder to your GAS project ID
+├── .github/
+│   └── workflows/
+│       └── deploy.yml     ← GitHub Actions: auto-push on commit
+├── package.json
+└── README.md
+```
+
+---
+
+## Author
+
+**Ahmed Naguib** | Project Manager – ALFANAR PROJECTS  
+O&M MV Distribution Network | Saudi Arabia
+
+node_modules/
+.env
+*.log
+.DS_Store
+# Never commit personal OAuth tokens
+~/.clasprc.json
